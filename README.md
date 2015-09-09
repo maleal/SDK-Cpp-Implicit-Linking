@@ -1,14 +1,14 @@
 # SDK-Cpp-Implicit-Linking
-Dll en C++ para transaccionar con el gateway 'Todo Pago'.
+Dll en C++ para transaccionar con el gateway 'Todo Pago', de vinculación Implícita.
 
 # SDK-Cpp-Explicit-Linking
-SDK-C++ de Vinculación Explícita
+SDK-C++ de Vinculación Implícita
 
 <a name="inicio"></a>		
 SDK C++ 	
 ==================	
 		
-Modulo de conexión con el gateway de pago 'Todo Pago'		
+Modulo de conexión con el gateway de pago 'Todo Pago'	(Dll impementada como interfaz para 'Todo Pago')	
 
 ######[Instalación](#instalacion)		
 ######[Generalidades](#general)	
@@ -21,9 +21,9 @@ Modulo de conexión con el gateway de pago 'Todo Pago'
 ## Instalación
 <ul>
 <li>a. Se debe descargar la última versión del SDK desde el botón Download ZIP, branch master.		
-   Una vez descargado y descomprimido, debe incluir el archivo TPConnectorDll.h a su proyecto.
 </li>
-<li>b. Deberá definir la macro "DLL_EXPLICIT_LINK" para todas las configuraciones de su proyecto.
+<li>b. Una vez descargado y descomprimido, debe incluir el archivo TPConnectorDll.h y enlazar la librería        	'IpLinkTPConnectorDll.lib' en su proyecto. Podra definir o no la macro DLL_EXPORTS, con lo cual decidirá si usara 
+el atributo dllexport o dllimport en su proyecto.
 Si usa Visual C++ 2012  deberá ir a: Property Pages -> C/C++ -> Preprocessor y seleccionar "All Configurations" 
 para luego en "Preprocessor Definitios" crear la macro.
 </li>
@@ -41,25 +41,21 @@ Esta versión soporta únicamente pago en moneda nacional argentina (CURRENCYCOD
 
 <a name="uso"></a>		
 ## Uso		
-####1.Cargar la Dll y obtener el puntero a una instancia de la interfaz (TodoPago).
-	Para esto deberá usar la función API LoadLibrary() y a GetProcAddress() ej:
+####1.Solo necesita crear un puntero de la clase 'TPCtor_Interface' e inicializarlo con 'GetDLLInterface()' para tener acceso a todos los metodos de la interfáz a Todo Pago:
+	Ej:
 	
-		HMODULE hDll = LoadLibrary( "ExLinkTPConnectorDll.dll" );
-		if (hDll)
-			PF_GetDLLInterface pIntf = (PF_GetDLLInterface) GetProcAddress(hDll, "GetDLLInterface");
+		TPCtor_Interface* pConntor = GetDLLInterface();
+		
 ####2.Inicializar el conector (TodoPago).
-	Al puntero a funcion obtenido, asignelo a uno del tipo de la clase "TPCtor_Interface" con el cual
-	accederá a todas las operaciones de la interfaz pero primero deberá inicializar el conector con 
-	el metodo 'TPConnector_Init' de la siguiente forma:
-	 -crear un string con el Endpoint suministrados por Todo Pago
-	 -crear un string Athorization con el dato del http header suministrados por Todo Pago
-	 -llame al metodo 'TPConnector_Init'
-
-		TPCtor_Interface *pConntor = pIntf();
-	 	if( pConntor ) {
-			cout << "----------------Calling SendAuthorizeRequest() ........." << endl;
-			if(ret = pConntor->TPConnector_Init(Endpoint, Athorization) == 0)
-				cout << "---------------- SendAuthorizeRequest() OK\n";
+	 Para lo cual deberrá llamar a 'TPConnector_Init()' de la siguiente forma
+	 -crear un std::string con el Endpoint suministrados por Todo Pago
+	 -crear un std::string Athorization con el dato del http header suministrados por Todo Pago
+	 -llame al metodo 'TPConnector_Init' Ej:
+	 
+	 	cout << "---------------- Init TPConnecto .........\n";
+		if(ret = pConntor->TPConnector_Init(endPointURL, strAthorization) == 0)
+			cout << "---------------- TPConnector_Init() OK\n";
+		
 ####3.Servicio Web 'Authorize Request' (TodoPago).
 	Antes de consumir el servicio web "AuthorizeRequest" debemos invocar al método
 	"SendAuthorizeRequest_SetParams(request, payload)"
@@ -152,6 +148,10 @@ Esta versión soporta únicamente pago en moneda nacional argentina (CURRENCYCOD
 			PayLParams[CSITTOTALAMOUNT] 		= "1254.40";//CONDICIONAL.      
 			PayLParams[CSITQUANTITY]		= "1";//CONDICIONAL.       
 			PayLParams[CSITUNITPRICE]		= "1254.40";
+			
+			cout << "---------------- SendAuthorizeRequest_SetParams()	.........\n";
+			if( ret = pConntor->SendAuthorizeRequest_SetParams(RParams, PayLParams) == 0)
+				cout << "---------------- SendAuthorizeRequest_SetParams()	OK\n";
 ```
 <ins><strong>Invocamos al servicio web</strong></ins>
 		En este caso hay que llamar a SendAuthorizeRequest_Send( Output ). Este metodo devolverá
@@ -162,6 +162,19 @@ Esta versión soporta únicamente pago en moneda nacional argentina (CURRENCYCOD
 		Out[Message]
 		Out[REQUEST_KEY]
 		Out[URL_Request]
+
+```C++
+		map<string, string>::iterator it;
+		map<string, string>output;
+		
+		cout << "---------------- SendAuthorizeRequest_Send()	..............\n";
+		if( ret = pConntor->SendAuthorizeRequest_Send(output) == 0) {
+			cout << "---------------- SendAuthorizeRequest_Send()	OK\n";
+			for(it=output.begin(); it != output.end(); it++)
+				cout << it->first << " = " << it->second << endl;
+		}
+```
+
 		
 ####4.Confirmación de transacción.		
 En este caso hay que llamar a GetAuthorizeAnswer_Send(input, output), que lleva dos parámetros map<string, string>. El parámetro 'input' llevara los datos necesario para la transaccion y en 'output' se alogará la respuesta, en el siguiente ejemplose muestra su uso:
